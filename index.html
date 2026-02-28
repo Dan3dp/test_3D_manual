@@ -76,7 +76,7 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xfcfcfc); 
 
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.01, 2000);
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.1, 1500);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
