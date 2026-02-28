@@ -6,21 +6,17 @@
     <style>
         :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; }
         body { margin: 0; display: flex; height: 100vh; font-family: sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
-        
         .sidebar { width: 340px; padding: 25px; background: var(--sidebar); border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 10; }
-        
         select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-weight: bold; }
-        
         .step-content { flex-grow: 1; overflow-y: auto; }
         h1 { font-size: 20px; margin: 5px 0; color: #0f172a; }
         p { line-height: 1.6; color: #64748b; font-size: 14px; margin-bottom: 20px; }
-        
         .nav-btns { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
         button:disabled { background: #cbd5e1; cursor: not-allowed; }
-        
         #container { flex-grow: 1; position: relative; background: #fcfcfc; }
         .reset-btn { background: #64748b; font-size: 11px; padding: 6px; margin-top: 5px; width: 100%; }
+        .hint { position: absolute; bottom: 20px; right: 20px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.9); padding: 5px 12px; border: 1px solid #e2e8f0; border-radius: 20px; }
     </style>
 </head>
 <body>
@@ -42,7 +38,9 @@
         </div>
     </div>
 
-    <div id="container"></div>
+    <div id="container">
+        <div class="hint">Left Click: CAD Rotate | Right Click: Pan | Scroll: Zoom</div>
+    </div>
 
     <script type="importmap">
         {
@@ -64,9 +62,9 @@
         let scene, camera, renderer, controls, currentModel;
         const loader = new GLTFLoader();
 
-        // Load the JSON configuration
+        // 1. Fetch JSON
         fetch('menu.json')
-            .then(response => response.json())
+            .then(res => res.json())
             .then(data => {
                 menuData = data;
                 populateChapters();
@@ -84,30 +82,53 @@
             });
         }
 
-        window.loadChapter = (idx) => {
-            currentChapIdx = parseInt(idx);
-            loadStep(currentChapIdx, 0);
-        };
+        window.loadChapter = (idx) => { loadStep(parseInt(idx), 0); };
+        window.changeStep = (dir) => { loadStep(currentChapIdx, currentStepIdx + dir); };
 
-        window.changeStep = (dir) => {
-            let nextIdx = currentStepIdx + dir;
-            loadStep(currentChapIdx, nextIdx);
-        };
+        function initThree() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xfcfcfc);
+            
+            // CAMERA: Reset to 0.1, 2000 as requested
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.1, 2000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth - 340, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            // --- ALL-DIRECTION LIGHTING ---
+            // HemisphereLight provides light from top and bottom simultaneously
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+            scene.add(hemiLight);
+
+            // Main Directional Light (Front-Top)
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(5, 10, 7.5);
+            scene.add(dirLight);
+            
+            // Fill Light (Back-Side)
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            fillLight.position.set(-5, 2, -5);
+            scene.add(fillLight);
+
+            controls = new ArcballControls(camera, renderer.domElement, scene);
+            controls.setGizmosVisible(false);
+            animate();
+        }
 
         function loadStep(chapIdx, stepIdx) {
             currentChapIdx = chapIdx;
             currentStepIdx = stepIdx;
             const step = menuData[chapIdx].steps[stepIdx];
 
-            // Update UI
             document.getElementById('step-num').innerText = `STEP ${String(stepIdx + 1).padStart(2, '0')}`;
             document.getElementById('step-title').innerText = step.title;
             document.getElementById('step-desc').innerText = step.desc;
-            
             document.getElementById('prevBtn').disabled = (stepIdx === 0);
             document.getElementById('nextBtn').disabled = (stepIdx === menuData[chapIdx].steps.length - 1);
 
-            // Load 3D
             if (currentModel) scene.remove(currentModel);
             loader.load(step.file, (gltf) => {
                 currentModel = gltf.scene;
@@ -125,31 +146,12 @@
             });
         }
 
-        function initThree() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xfcfcfc);
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.1, 2000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth - 340, window.innerHeight);
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            document.getElementById('container').appendChild(renderer.domElement);
-
-            // 6-Point Lighting
-            const addL = (x, y, z, i) => { const l = new THREE.DirectionalLight(0xffffff, i); l.position.set(x, y, z); scene.add(l); };
-            addL(5, 5, 5, 1.5); addL(-5, 5, 5, 1.2); addL(0, -5, 0, 1.0); addL(0, 5, -5, 1.2);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-
-            controls = new ArcballControls(camera, renderer.domElement, scene);
-            controls.setGizmosVisible(false);
-            animate();
-        }
-
         window.fitCameraToModel = () => {
             if (!currentModel) return;
             const box = new THREE.Box3().setFromObject(currentModel);
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = (maxDim / (2 * Math.tan((camera.fov * Math.PI / 180) / 2))) * 1.1;
+            const dist = (maxDim / (2 * Math.tan((camera.fov * Math.PI / 180) / 2))) * 1.15;
             camera.position.set(dist * 0.8, dist * 0.6, dist * 0.8);
             camera.lookAt(0, 0, 0);
             controls.target.set(0,0,0);
