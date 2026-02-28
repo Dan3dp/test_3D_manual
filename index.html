@@ -2,69 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Pro Studio CAD Manual</title>
+    <title>Auto-Fit CAD Manual</title>
     <style>
-        :root { 
-            --accent: #2563eb; 
-            --bg: #ffffff; 
-            --sidebar: #f8fafc; 
-            --text: #1e293b; 
-            --subtext: #64748b;
-        }
-        
-        body { margin: 0; display: flex; height: 100vh; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
-        
-        .sidebar { 
-            width: 340px; 
-            padding: 30px; 
-            background: var(--sidebar); 
-            border-right: 1px solid #e2e8f0; 
-            display: flex; 
-            flex-direction: column; 
-            z-index: 10; 
-        }
-        
+        :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; }
+        body { margin: 0; display: flex; height: 100vh; font-family: sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+        .sidebar { width: 340px; padding: 30px; background: var(--sidebar); border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 10; }
         .step-content { flex-grow: 1; }
-        .step-num { font-size: 12px; color: var(--accent); font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
-        h1 { font-size: 24px; margin: 10px 0; color: #0f172a; }
-        p { line-height: 1.6; color: var(--subtext); font-size: 15px; }
-        
+        h1 { font-size: 22px; margin: 10px 0; }
+        p { line-height: 1.6; color: #64748b; font-size: 14px; }
         .nav-btns { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
-        button { 
-            flex: 1; 
-            padding: 12px; 
-            border: none; 
-            border-radius: 8px; 
-            background: var(--accent); 
-            color: white; 
-            cursor: pointer; 
-            font-weight: bold; 
-            transition: 0.2s; 
-        }
-        button:hover { background: #1d4ed8; }
-        button:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
-
-        #container { flex-grow: 1; position: relative; outline: none; }
-        .hint { 
-            position: absolute; 
-            bottom: 20px; 
-            right: 20px; 
-            font-size: 11px; 
-            color: #94a3b8; 
-            background: rgba(255,255,255,0.9); 
-            padding: 5px 12px; 
-            border: 1px solid #e2e8f0;
-            border-radius: 20px; 
-        }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        #container { flex-grow: 1; position: relative; }
+        .hint { position: absolute; bottom: 20px; right: 20px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.9); padding: 5px 12px; border: 1px solid #e2e8f0; border-radius: 20px; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
         <div class="step-content">
-            <div id="step-num" class="step-num">Step 01</div>
+            <div id="step-num" style="color:var(--accent); font-weight:bold; font-size:12px;">STEP 01</div>
             <h1 id="step-title">Y-Axis Assembly</h1>
-            <p id="step-desc">Loading assembly instructions...</p>
+            <p id="step-desc">Loading instructions...</p>
         </div>
         <div class="nav-btns">
             <button id="prevBtn" onclick="changeStep(-1)" disabled>Back</button>
@@ -105,8 +64,7 @@
             }
         ];
 
-        let currentIdx = 0;
-        let scene, camera, renderer, controls, currentModel;
+        let currentIdx = 0, scene, camera, renderer, controls, currentModel;
         const loader = new GLTFLoader();
 
         init();
@@ -116,37 +74,19 @@
             scene.background = new THREE.Color(0xfcfcfc); 
 
             camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.1, 1000);
-            camera.position.set(3, 3, 3);
-
+            
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            
-            // Enable physically correct lighting
             renderer.toneMapping = THREE.ReinhardToneMapping;
             renderer.toneMappingExposure = 1.2;
-            
             document.getElementById('container').appendChild(renderer.domElement);
 
-            // --- THE BETTER LIGHTING (Three-Point Setup) ---
-            
-            // 1. Key Light: High intensity from the front-side
+            // Studio Lighting
             const keyLight = new THREE.DirectionalLight(0xffffff, 2);
             keyLight.position.set(5, 10, 5);
             scene.add(keyLight);
-
-            // 2. Fill Light: Softer light from the opposite side to fill shadows
-            const fillLight = new THREE.DirectionalLight(0xffffff, 1);
-            fillLight.position.set(-5, 5, 2);
-            scene.add(fillLight);
-
-            // 3. Back Light: Adds a "rim" highlight to separate model from background
-            const backLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            backLight.position.set(0, -5, -5);
-            scene.add(backLight);
-
-            // 4. Ambient Light: General room light for even coverage
-            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
             controls = new ArcballControls(camera, renderer.domElement, scene);
             controls.setGizmosVisible(false);
@@ -162,10 +102,34 @@
             if (currentModel) scene.remove(currentModel);
             loader.load(url, (gltf) => {
                 currentModel = gltf.scene;
+                
+                // 1. Add Edges (for better visibility)
+                currentModel.traverse((node) => {
+                    if (node.isMesh) {
+                        const edges = new THREE.EdgesGeometry(node.geometry, 15);
+                        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x333333 }));
+                        node.add(line);
+                    }
+                });
+
+                // 2. Center the Model
                 const box = new THREE.Box3().setFromObject(currentModel);
                 const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
                 currentModel.position.sub(center);
                 scene.add(currentModel);
+
+                // 3. FIT TO WINDOW (The Magic Part)
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                
+                // Add a little extra space (buffer) so it's not touching the edges
+                cameraZ *= 1.5; 
+
+                camera.position.set(cameraZ, cameraZ / 2, cameraZ); // Set an isometric-style starting position
+                camera.lookAt(0, 0, 0);
+                controls.update();
             });
         }
 
