@@ -5,7 +5,7 @@
       {
         "title": "Base Extrusion",
         "desc": "Align the MGN linear rail with the aluminum extrusion.",
-        "file": "chapters/01-frame/step1.glb"
+        "file": "100_01__Beam_MGN_Y_Axis__asmbl___V1.glb"
       },
       {
         "title": "Corner Brackets",
