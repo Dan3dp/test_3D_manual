@@ -2,41 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>CAD Manual - Perfect Fit & Light</title>
+    <title>Dynamic CAD Manual</title>
     <style>
         :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; }
         body { margin: 0; display: flex; height: 100vh; font-family: sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
-        .sidebar { width: 340px; padding: 30px; background: var(--sidebar); border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 10; }
-        .step-content { flex-grow: 1; }
-        h1 { font-size: 22px; margin: 10px 0; }
-        p { line-height: 1.6; color: #64748b; font-size: 14px; }
-        .nav-btns { display: flex; gap: 10px; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        
+        .sidebar { width: 340px; padding: 25px; background: var(--sidebar); border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 10; }
+        
+        select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-weight: bold; }
+        
+        .step-content { flex-grow: 1; overflow-y: auto; }
+        h1 { font-size: 20px; margin: 5px 0; color: #0f172a; }
+        p { line-height: 1.6; color: #64748b; font-size: 14px; margin-bottom: 20px; }
+        
+        .nav-btns { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
-        button:hover { background: #1d4ed8; }
         button:disabled { background: #cbd5e1; cursor: not-allowed; }
-        .reset-btn { background: #64748b; margin-top: 10px; font-size: 12px; padding: 8px; }
-        #container { flex-grow: 1; position: relative; }
-        .hint { position: absolute; bottom: 20px; right: 20px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.9); padding: 5px 12px; border: 1px solid #e2e8f0; border-radius: 20px; }
+        
+        #container { flex-grow: 1; position: relative; background: #fcfcfc; }
+        .reset-btn { background: #64748b; font-size: 11px; padding: 6px; margin-top: 5px; width: 100%; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
+        <label style="font-size: 11px; color: #94a3b8; font-weight: bold;">SELECT CHAPTER</label>
+        <select id="chapterSelect" onchange="loadChapter(this.value)"></select>
+
         <div class="step-content">
             <div id="step-num" style="color:var(--accent); font-weight:bold; font-size:12px;">STEP 01</div>
-            <h1 id="step-title">Y-Axis Assembly</h1>
-            <p id="step-desc">Loading instructions...</p>
+            <h1 id="step-title">Select a Chapter</h1>
+            <p id="step-desc">Loading configuration...</p>
             <button class="reset-btn" onclick="fitCameraToModel()">Reset Camera View</button>
         </div>
+
         <div class="nav-btns">
             <button id="prevBtn" onclick="changeStep(-1)" disabled>Back</button>
-            <button id="nextBtn" onclick="changeStep(1)">Next Step</button>
+            <button id="nextBtn" onclick="changeStep(1)" disabled>Next</button>
         </div>
     </div>
 
-    <div id="container">
-        <div class="hint">CAD Rotate (Left) | Pan (Right) | Zoom (Scroll)</div>
-    </div>
+    <div id="container"></div>
 
     <script type="importmap">
         {
@@ -52,139 +58,110 @@
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 
-        const steps = [
-            {
-                num: "Step 01",
-                title: "Y-Axis Beam",
-                desc: "Place the MGN linear rail on the extrusion.",
-                file: "100_01__Beam_MGN_Y_Axis__asmbl___V1.glb"
-            },
-            {
-                num: "Step 02",
-                title: "Motor Mount",
-                desc: "Secure the NEMA 17 motor using four M3 screws.",
-                file: "step2_motor.glb" 
-            }
-        ];
-
-        let currentIdx = 0, scene, camera, renderer, controls, currentModel;
+        let menuData = [];
+        let currentChapIdx = 0;
+        let currentStepIdx = 0;
+        let scene, camera, renderer, controls, currentModel;
         const loader = new GLTFLoader();
 
-        init();
+        // Load the JSON configuration
+        fetch('menu.json')
+            .then(response => response.json())
+            .then(data => {
+                menuData = data;
+                populateChapters();
+                initThree();
+                loadStep(0, 0);
+            });
 
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xfcfcfc); 
-
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.1, 1500);
-            
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth - 340, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.toneMapping = THREE.ACESFilmicToneMapping; // Better contrast than Reinhard
-            renderer.toneMappingExposure = 1.0;
-            document.getElementById('container').appendChild(renderer.domElement);
-
-            // --- STUDIO LIGHTING (Light from all directions) ---
-            const createLight = (x, y, z, intensity) => {
-                const light = new THREE.DirectionalLight(0xffffff, intensity);
-                light.position.set(x, y, z);
-                scene.add(light);
-            };
-
-            createLight(5, 5, 5, 1.5);    // Front-Top-Right
-            createLight(-5, 5, 5, 1.2);   // Front-Top-Left
-            createLight(0, -5, 0, 1.0);   // Bottom
-            createLight(0, 5, -5, 1.2);   // Back
-            createLight(5, 0, 0, 0.8);    // Right Side
-            createLight(-5, 0, 0, 0.8);   // Left Side
-            
-            scene.add(new THREE.AmbientLight(0xffffff, 0.6)); // Soft fill for everything
-
-            controls = new ArcballControls(camera, renderer.domElement, scene);
-            controls.setGizmosVisible(false);
-
-            loadModel(steps[currentIdx].file);
-            updateUI();
-
-            window.addEventListener('resize', onWindowResize);
-            animate();
+        function populateChapters() {
+            const select = document.getElementById('chapterSelect');
+            menuData.forEach((item, index) => {
+                let opt = document.createElement('option');
+                opt.value = index;
+                opt.innerHTML = item.chapter;
+                select.appendChild(opt);
+            });
         }
 
-        function loadModel(url) {
+        window.loadChapter = (idx) => {
+            currentChapIdx = parseInt(idx);
+            loadStep(currentChapIdx, 0);
+        };
+
+        window.changeStep = (dir) => {
+            let nextIdx = currentStepIdx + dir;
+            loadStep(currentChapIdx, nextIdx);
+        };
+
+        function loadStep(chapIdx, stepIdx) {
+            currentChapIdx = chapIdx;
+            currentStepIdx = stepIdx;
+            const step = menuData[chapIdx].steps[stepIdx];
+
+            // Update UI
+            document.getElementById('step-num').innerText = `STEP ${String(stepIdx + 1).padStart(2, '0')}`;
+            document.getElementById('step-title').innerText = step.title;
+            document.getElementById('step-desc').innerText = step.desc;
+            
+            document.getElementById('prevBtn').disabled = (stepIdx === 0);
+            document.getElementById('nextBtn').disabled = (stepIdx === menuData[chapIdx].steps.length - 1);
+
+            // Load 3D
             if (currentModel) scene.remove(currentModel);
-            loader.load(url, (gltf) => {
+            loader.load(step.file, (gltf) => {
                 currentModel = gltf.scene;
-                
-                currentModel.traverse((node) => {
+                currentModel.traverse(node => {
                     if (node.isMesh) {
                         const edges = new THREE.EdgesGeometry(node.geometry, 15);
                         const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x333333 }));
                         node.add(line);
                     }
                 });
-
                 const box = new THREE.Box3().setFromObject(currentModel);
-                const center = box.getCenter(new THREE.Vector3());
-                currentModel.position.sub(center); // Center the geometry
+                currentModel.position.sub(box.getCenter(new THREE.Vector3()));
                 scene.add(currentModel);
-
                 fitCameraToModel();
             });
         }
 
-        // --- IMPROVED FIT FUNCTION ---
-        window.fitCameraToModel = function() {
+        function initThree() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xfcfcfc);
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.001, 2000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth - 340, window.innerHeight);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            // 6-Point Lighting
+            const addL = (x, y, z, i) => { const l = new THREE.DirectionalLight(0xffffff, i); l.position.set(x, y, z); scene.add(l); };
+            addL(5, 5, 5, 1.5); addL(-5, 5, 5, 1.2); addL(0, -5, 0, 1.0); addL(0, 5, -5, 1.2);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+            controls = new ArcballControls(camera, renderer.domElement, scene);
+            controls.setGizmosVisible(false);
+            animate();
+        }
+
+        window.fitCameraToModel = () => {
             if (!currentModel) return;
-            
             const box = new THREE.Box3().setFromObject(currentModel);
             const size = box.getSize(new THREE.Vector3());
-            const center = box.getCenter(new THREE.Vector3());
-
             const maxDim = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            
-            // Calculate distance based on FOV to fit the model's largest dimension
-            let distance = maxDim / (2 * Math.tan(fov / 2));
-            
-            // Tighten the multiplier (1.1 instead of 1.8) to fill the screen
-            distance *= 1.1; 
-
-            // Position camera at an angle but at the calculated distance
-            camera.position.set(distance * 0.8, distance * 0.6, distance * 0.8);
+            const dist = (maxDim / (2 * Math.tan((camera.fov * Math.PI / 180) / 2))) * 1.1;
+            camera.position.set(dist * 0.8, dist * 0.6, dist * 0.8);
             camera.lookAt(0, 0, 0);
-            
-            // Update controls so the rotation point is also centered
-            controls.target.set(0, 0, 0);
+            controls.target.set(0,0,0);
             controls.update();
         };
 
-        function updateUI() {
-            const s = steps[currentIdx];
-            document.getElementById('step-num').innerText = s.num;
-            document.getElementById('step-title').innerText = s.title;
-            document.getElementById('step-desc').innerText = s.desc;
-            document.getElementById('prevBtn').disabled = (currentIdx === 0);
-            document.getElementById('nextBtn').disabled = (currentIdx === steps.length - 1);
-        }
-
-        window.changeStep = (dir) => {
-            currentIdx += dir;
-            loadModel(steps[currentIdx].file);
-            updateUI();
-        };
-
-        function onWindowResize() {
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+        window.onresize = () => {
             camera.aspect = (window.innerWidth - 340) / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
+        };
     </script>
 </body>
 </html>
