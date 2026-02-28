@@ -2,38 +2,62 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>High-Visibility CAD Manual</title>
+    <title>Pro CAD Manual - Progress Tracking</title>
     <style>
         :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; }
-        body { margin: 0; display: flex; height: 100vh; font-family: sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+        body { margin: 0; display: flex; height: 100vh; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+        
+        /* Sidebar Styles */
         .sidebar { width: 340px; padding: 25px; background: var(--sidebar); border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; z-index: 10; }
-        select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-weight: bold; }
-        .step-content { flex-grow: 1; overflow-y: auto; }
+        
+        /* Progress Bar Styles */
+        .progress-container { width: 100%; height: 6px; background: #e2e8f0; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+        #progress-fill { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s ease; }
+        #step-counter { font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; }
+
+        select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-weight: bold; cursor: pointer; }
+        
+        .step-content { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
         h1 { font-size: 20px; margin: 5px 0; color: #0f172a; }
-        p { line-height: 1.6; color: #64748b; font-size: 14px; margin-bottom: 20px; }
+        
+        #step-desc { 
+            line-height: 1.6; 
+            color: #64748b; 
+            font-size: 14px; 
+            margin-bottom: 20px;
+        }
+        #step-desc b, #step-desc strong { color: #1e293b; display: block; margin-top: 15px; }
+
         .nav-btns { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #1d4ed8; }
         button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        
         #viewport { flex-grow: 1; position: relative; background: #ffffff; }
         #canvas-container { width: 100%; height: 100%; position: absolute; top:0; left:0; }
-        #media-container { width: 100%; height: 100%; position: absolute; top:0; left:0; display: none; justify-content: center; align-items: center; background: #ffffff; padding: 20px; box-sizing: border-box; }
+        #media-container { width: 100%; height: 100%; position: absolute; top:0; left:0; display: none; justify-content: center; align-items: center; background: #ffffff; padding: 40px; box-sizing: border-box; }
         #media-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
         #media-container iframe { width: 100%; height: 100%; border: none; }
-        .reset-btn { background: #64748b; font-size: 11px; padding: 6px; margin-top: 5px; width: 100%; }
+
+        .reset-btn { background: #64748b; font-size: 11px; padding: 6px; margin-top: 5px; width: 100%; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .hint { position: absolute; bottom: 20px; right: 20px; font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.9); padding: 5px 12px; border: 1px solid #e2e8f0; border-radius: 20px; pointer-events: none;}
     </style>
 </head>
 <body>
 
     <div class="sidebar">
-        <label style="font-size: 11px; color: #94a3b8; font-weight: bold;">SELECT CHAPTER</label>
+        <div class="progress-container"><div id="progress-fill"></div></div>
+        <div id="step-counter">Step 1 of 1</div>
+
+        <label style="font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 5px;">CHAPTER</label>
         <select id="chapterSelect" onchange="loadChapter(this.value)"></select>
+
         <div class="step-content">
-            <div id="step-num" style="color:var(--accent); font-weight:bold; font-size:12px;">STEP 01</div>
             <h1 id="step-title">Loading...</h1>
-            <p id="step-desc">Please wait.</p>
+            <div id="step-desc">Connecting to manual data...</div>
             <button id="resetViewBtn" class="reset-btn" onclick="fitCameraToModel()">Reset Camera View</button>
         </div>
+
         <div class="nav-btns">
             <button id="prevBtn" onclick="changeStep(-1)" disabled>Back</button>
             <button id="nextBtn" onclick="changeStep(1)" disabled>Next</button>
@@ -64,7 +88,6 @@
         let scene, camera, renderer, controls, currentModel;
         const loader = new GLTFLoader();
 
-        // CACHE BUSTER ADDED HERE
         fetch('menu.json?v=' + new Date().getTime())
             .then(res => res.json())
             .then(data => {
@@ -72,15 +95,10 @@
                 populateChapters();
                 initThree();
                 loadStep(0, 0);
-            })
-            .catch(err => {
-                document.getElementById('step-title').innerText = "JSON Error";
-                document.getElementById('step-desc').innerText = "Check menu.json for typos! Error: " + err;
             });
 
         function populateChapters() {
             const select = document.getElementById('chapterSelect');
-            select.innerHTML = ""; // Clear before populating
             menuData.forEach((item, index) => {
                 let opt = document.createElement('option');
                 opt.value = index; opt.innerHTML = item.chapter;
@@ -119,14 +137,22 @@
         function loadStep(chapIdx, stepIdx) {
             currentChapIdx = chapIdx;
             currentStepIdx = stepIdx;
-            const step = menuData[chapIdx].steps[stepIdx];
+            const chapter = menuData[chapIdx];
+            const step = chapter.steps[stepIdx];
             const file = step.file.toLowerCase();
 
-            document.getElementById('step-num').innerText = `STEP ${String(stepIdx + 1).padStart(2, '0')}`;
+            // --- PROGRESS BAR UPDATE ---
+            const totalSteps = chapter.steps.length;
+            const progressPercent = ((stepIdx + 1) / totalSteps) * 100;
+            document.getElementById('progress-fill').style.width = `${progressPercent}%`;
+            document.getElementById('step-counter').innerText = `Step ${stepIdx + 1} of ${totalSteps}`;
+
+            // Update UI Text
             document.getElementById('step-title').innerText = step.title;
-            document.getElementById('step-desc').innerText = step.desc;
+            document.getElementById('step-desc').innerHTML = step.desc.replace(/\n/g, '<br>');
             document.getElementById('prevBtn').disabled = (stepIdx === 0);
-            document.getElementById('nextBtn').disabled = (stepIdx === menuData[chapIdx].steps.length - 1);
+            document.getElementById('nextBtn').disabled = (stepIdx === totalSteps - 1);
+            document.getElementById('chapterSelect').value = chapIdx;
 
             const canvasDiv = document.getElementById('canvas-container');
             const mediaDiv = document.getElementById('media-container');
@@ -158,11 +184,7 @@
                 mediaDiv.style.display = "flex";
                 hint.style.display = "none";
                 resetBtn.style.display = "none";
-                if (file.endsWith('.pdf')) {
-                    mediaDiv.innerHTML = `<iframe src="${step.file}"></iframe>`;
-                } else {
-                    mediaDiv.innerHTML = `<img src="${step.file}" alt="Manual Image">`;
-                }
+                mediaDiv.innerHTML = file.endsWith('.pdf') ? `<iframe src="${step.file}"></iframe>` : `<img src="${step.file}" alt="Diagram">`;
             }
         }
 
