@@ -6,20 +6,20 @@
         "title": "1.0: About the Project",
         "desc": "Some basic things to know about Xplorer 3D printer",
         "file": "1.0: About the Project.pdf"
-      },
-      {
-        "title": "Corner Brackets",
-        "desc": " 123 Attach the L-brackets. GAGAGAGAGAGAg. AKAKJAKAJAKAKJ. AAKHakahkahakhakah",
-        "file": "stepper.jpeg"
       }
     ]
   },
   {
-    "chapter": "Chapter 2: Motion System",
+    "chapter": "Chapter 2: Frame",
     "steps": [
       {
-        "title": "Y-Axis Motor",
-        "desc": "First, ensure the extrusion is clean of debris.\n\n**BOM for this step:**\n- 1x Aluminum Extrusion (2040)\n- 1x MGN12H Linear Rail (300mm)\n- 12x M3x8mm Button Head Screws\n- 12x M3 T-Nuts",
+        "title": "2.0: Frame - Introdution",
+        "desc": "The Xplorer's frame is built entirely from 30×30 mm aluminum extrusion profiles, providing a strong, stable foundation for quality printing.
+                \n The assembly process is intentionally straightforward, with a simple and logical structure that’s easy to follow—even for first-time builders.
+                \n To ensure dimensional accuracy and perfect alignment:
+                \n Milled reference surfaces are used in all critical areas, so components align precisely during assembly.
+                \n The result is a frame that stays square, rigid, and vibration-resistant, even during high-speed or multi-toolhead operations.
+                \n This solid foundation is key to the Xplorer’s modular architecture and consistently reliable print quality.",
         "file": "chapters/02-motors/step1.glb"
       }
     ]
