@@ -4,49 +4,89 @@
     <meta charset="UTF-8">
     <title>Xplorer IDEX Twin AFC</title>
     <style>
-        :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; --border: #e2e8f0; }
-        body.dark-mode { --bg: #121212; --sidebar: #1a1a1a; --text: #e2e8f0; --border: #333; }
+        :root { 
+            --accent: #2563eb; 
+            --bg: #ffffff; 
+            --sidebar: #f8fafc; 
+            --text: #1e293b; 
+            --border: #e2e8f0; 
+        }
+
+        /* Dark Mode Theme */
+        body.dark-mode {
+            --bg: #121212;
+            --sidebar: #1a1a1a;
+            --text: #e2e8f0;
+            --border: #333;
+        }
+
         body { margin: 0; display: flex; height: 100vh; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; transition: background 0.3s; }
-        .sidebar { width: 340px; padding: 25px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
+        
+        /* Sidebar */
+        .sidebar { width: 340px; padding: 25px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; transition: background 0.3s; }
+        
         .progress-container { width: 100%; height: 6px; background: var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
         #progress-fill { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s ease; }
         #step-counter { font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; }
+
         select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-weight: bold; cursor: pointer; }
+        
         .step-content { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
         h1 { font-size: 20px; margin: 5px 0; color: var(--accent); }
         #step-desc { line-height: 1.6; font-size: 14px; margin-bottom: 20px; }
         #step-desc b, #step-desc strong { color: var(--text); display: block; margin-top: 15px; }
+
         .nav-btns { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
         button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        
         .ui-controls { display: flex; gap: 5px; margin-top: 10px; }
         .reset-btn { background: #64748b; font-size: 11px; padding: 8px; flex: 2; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .theme-btn { background: #444; font-size: 11px; padding: 8px; flex: 1; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        #viewport { flex-grow: 1; position: relative; }
-        #canvas-container, #media-container { width: 100%; height: 100%; position: absolute; top:0; left:0; }
-        #media-container { display: none; justify-content: center; align-items: center; padding: 40px; box-sizing: border-box; }
-        #media-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .hint { position: absolute; bottom: 20px; right: 20px; font-size: 11px; color: #94a3b8; background: rgba(0,0,0,0.05); padding: 5px 12px; border-radius: 20px; pointer-events: none;}
+
+        /* Viewport */
+        #viewport { flex-grow: 1; position: relative; background: #ffffff; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top:0; left:0; }
         
-        /* Loading Spinner */
+        /* Media Fix */
+        #media-container { 
+            width: 100%; 
+            height: 100%; 
+            position: absolute; 
+            top:0; 
+            left:0; 
+            display: none; 
+            justify-content: center; 
+            align-items: center; 
+            background: #ffffff; 
+            padding: 0; /* Removed padding to allow PDF to fill space */
+            box-sizing: border-box; 
+        }
+        #media-container iframe { width: 100%; height: 100%; border: none; }
+        #media-container img { max-width: 95%; max-height: 95%; object-fit: contain; }
+
         #loader-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; color: var(--accent); font-weight: bold; z-index: 5; }
+        .hint { position: absolute; bottom: 20px; right: 20px; font-size: 11px; color: #94a3b8; background: rgba(0,0,0,0.05); padding: 5px 12px; border-radius: 20px; pointer-events: none;}
     </style>
 </head>
-<body>
+<body class="light-mode">
 
     <div class="sidebar">
         <div class="progress-container"><div id="progress-fill"></div></div>
         <div id="step-counter">Step 1 of 1</div>
+
         <label style="font-size: 10px; color: #94a3b8; font-weight: bold;">CHAPTER</label>
         <select id="chapterSelect" onchange="loadChapter(this.value)"></select>
+
         <div class="step-content">
             <h1 id="step-title">Loading...</h1>
             <div id="step-desc">Connecting...</div>
             <div class="ui-controls">
-                <button class="reset-btn" onclick="fitCameraToModel()">Reset Camera</button>
-                <button class="theme-btn" onclick="document.body.classList.toggle('dark-mode')">Dark</button>
+                <button id="resetViewBtn" class="reset-btn" onclick="fitCameraToModel()">Reset Camera</button>
+                <button class="theme-btn" onclick="document.body.classList.toggle('dark-mode')">Dark Mode</button>
             </div>
         </div>
+
         <div class="nav-btns">
             <button id="prevBtn" onclick="changeStep(-1)" disabled>Back</button>
             <button id="nextBtn" onclick="changeStep(1)" disabled>Next</button>
@@ -127,7 +167,7 @@
             const chapter = menuData[chapIdx];
             const step = chapter.steps[stepIdx];
             const fileName = step.file.toLowerCase();
-            const version = '?v=' + new Date().getTime();
+            const version = '&v=' + new Date().getTime();
 
             document.getElementById('progress-fill').style.width = `${((stepIdx + 1) / chapter.steps.length) * 100}%`;
             document.getElementById('step-counter').innerText = `Step ${stepIdx + 1} of ${chapter.steps.length}`;
@@ -140,11 +180,16 @@
             const canvasDiv = document.getElementById('canvas-container');
             const mediaDiv = document.getElementById('media-container');
             const loaderUI = document.getElementById('loader-ui');
+            const resetBtn = document.getElementById('resetViewBtn');
+            const hint = document.getElementById('3d-hint');
 
             if (fileName.endsWith('.glb') || fileName.endsWith('.gltf')) {
                 canvasDiv.style.display = "block";
                 mediaDiv.style.display = "none";
                 loaderUI.style.display = "block";
+                resetBtn.style.display = "block";
+                hint.style.display = "block";
+
                 if (currentModel) scene.remove(currentModel);
                 
                 loader.load(step.file + version, (gltf) => {
@@ -171,9 +216,19 @@
             } else {
                 canvasDiv.style.display = "none";
                 loaderUI.style.display = "none";
+                resetBtn.style.display = "none";
+                hint.style.display = "none";
                 mediaDiv.style.display = "flex";
+
                 const mediaUrl = step.file + version;
-                mediaDiv.innerHTML = fileName.endsWith('.pdf') ? `<iframe src="${mediaUrl}"></iframe>` : `<img src="${mediaUrl}">`;
+
+                if (fileName.endsWith('.pdf')) {
+                    mediaDiv.style.padding = "0";
+                    mediaDiv.innerHTML = `<iframe src="${mediaUrl}"></iframe>`;
+                } else {
+                    mediaDiv.style.padding = "40px";
+                    mediaDiv.innerHTML = `<img src="${mediaUrl}">`;
+                }
             }
         }
 
