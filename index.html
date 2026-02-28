@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>CAD Manual - No Clipping</title>
+    <title>CAD Manual - Perfect Fit & Light</title>
     <style>
         :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; }
         body { margin: 0; display: flex; height: 100vh; font-family: sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
@@ -76,20 +76,30 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xfcfcfc); 
 
-            // FIX: Near plane changed to 0.001 to allow extreme zooming
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.01, 2000);
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.001, 2000);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.toneMapping = THREE.ReinhardToneMapping;
-            renderer.toneMappingExposure = 1.2;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; // Better contrast than Reinhard
+            renderer.toneMappingExposure = 1.0;
             document.getElementById('container').appendChild(renderer.domElement);
 
-            const keyLight = new THREE.DirectionalLight(0xffffff, 2);
-            keyLight.position.set(5, 10, 5);
-            scene.add(keyLight);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            // --- STUDIO LIGHTING (Light from all directions) ---
+            const createLight = (x, y, z, intensity) => {
+                const light = new THREE.DirectionalLight(0xffffff, intensity);
+                light.position.set(x, y, z);
+                scene.add(light);
+            };
+
+            createLight(5, 5, 5, 1.5);    // Front-Top-Right
+            createLight(-5, 5, 5, 1.2);   // Front-Top-Left
+            createLight(0, -5, 0, 1.0);   // Bottom
+            createLight(0, 5, -5, 1.2);   // Back
+            createLight(5, 0, 0, 0.8);    // Right Side
+            createLight(-5, 0, 0, 0.8);   // Left Side
+            
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6)); // Soft fill for everything
 
             controls = new ArcballControls(camera, renderer.domElement, scene);
             controls.setGizmosVisible(false);
@@ -116,26 +126,36 @@
 
                 const box = new THREE.Box3().setFromObject(currentModel);
                 const center = box.getCenter(new THREE.Vector3());
-                currentModel.position.sub(center);
+                currentModel.position.sub(center); // Center the geometry
                 scene.add(currentModel);
 
                 fitCameraToModel();
             });
         }
 
-        // --- GLOBAL CAMERA RESET FUNCTION ---
+        // --- IMPROVED FIT FUNCTION ---
         window.fitCameraToModel = function() {
             if (!currentModel) return;
+            
             const box = new THREE.Box3().setFromObject(currentModel);
             const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
-            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
             
-            cameraZ *= 1.8; // Buffer space
+            // Calculate distance based on FOV to fit the model's largest dimension
+            let distance = maxDim / (2 * Math.tan(fov / 2));
             
-            camera.position.set(cameraZ, cameraZ / 1.5, cameraZ);
+            // Tighten the multiplier (1.1 instead of 1.8) to fill the screen
+            distance *= 1.1; 
+
+            // Position camera at an angle but at the calculated distance
+            camera.position.set(distance * 0.8, distance * 0.6, distance * 0.8);
             camera.lookAt(0, 0, 0);
+            
+            // Update controls so the rotation point is also centered
+            controls.target.set(0, 0, 0);
             controls.update();
         };
 
