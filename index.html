@@ -92,6 +92,8 @@
             width: 100%;
             height: 100%;
             outline: none;
+            /* Focus the camera on the center of the object */
+            --min-hotspot-opacity: 0;
         }
 
         .hint {
@@ -99,7 +101,7 @@
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             color: white;
             padding: 8px 16px;
             border-radius: 20px;
@@ -133,30 +135,32 @@
             alt="3D CAD Model"
             camera-controls 
             touch-action="none"
+            camera-orbit="45deg 75deg auto"
             min-camera-orbit="auto auto auto"
             max-camera-orbit="auto auto auto"
+            interpolation-decay="200"
             shadow-intensity="1" 
             environment-image="neutral"
             exposure="1">
         </model-viewer>
         
-        <div class="hint">Left Click to Rotate 360° | Scroll to Zoom</div>
+        <div class="hint">Left Click: Rotate 360° | Right Click: Pan | Scroll: Zoom</div>
     </div>
 
     <script>
-        // Setup your steps here!
+        // Define your steps here
         const steps = [
             {
                 label: "Step 01",
                 title: "Y-Axis Beam Assembly",
-                desc: "Begin by inspecting the aluminum extrusion. Ensure there is no debris in the slots. Position the MGN linear rail on the top face.",
+                desc: "Begin by inspecting the aluminum extrusion. Position the MGN linear rail on the top face.",
                 file: "100_01__Beam_MGN_Y_Axis__asmbl___V1.glb"
             },
             {
                 label: "Step 02",
                 title: "Mounting the Motor",
-                desc: "Attach the NEMA 17 motor to the end bracket using four M3x10mm screws. Do not over-tighten yet.",
-                file: "step2_motor.glb" // Replace with your actual filename
+                desc: "Attach the NEMA 17 motor to the end bracket using four M3x10mm screws.",
+                file: "step2_motor.glb" 
             }
         ];
 
