@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Xplorer IDEX Twin AFC - Assembly Manual</title>
+    <title>Xplorer IDEX Twin AFC - Professional Manual</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; --border: #e2e8f0; }
@@ -11,7 +11,6 @@
         .sidebar { width: 340px; padding: 25px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
         .progress-container { width: 100%; height: 6px; background: var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
         #progress-fill { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s ease; }
-        #step-counter { font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; }
         select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-weight: bold; cursor: pointer; }
         .step-content { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
         h1 { font-size: 22px; margin: 5px 0; color: var(--accent); line-height: 1.2; }
@@ -19,7 +18,7 @@
         .nav-btns { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
         button:disabled { background: #cbd5e1; cursor: not-allowed; }
-        #viewport { flex-grow: 1; position: relative; background: #ffffff; display: flex; }
+        #viewport { flex-grow: 1; position: relative; background: #ffffff; }
         #canvas-container { width: 100%; height: 100%; position: absolute; }
         #loader-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; color: var(--accent); font-weight: bold; z-index: 5; }
     </style>
@@ -27,12 +26,11 @@
 <body>
     <div class="sidebar">
         <div class="progress-container"><div id="progress-fill"></div></div>
-        <div id="step-counter">Step 1 of 1</div>
         <select id="chapterSelect" onchange="loadChapter(this.value)"></select>
         <div class="step-content">
             <h1 id="step-title">Xplorer IDEX</h1>
             <div id="step-desc">Loading...</div>
-            <button style="margin-top:10px; background:#64748b; color:white; border:none; padding:8px; border-radius:4px; font-size:11px; cursor:pointer;" onclick="fitCameraToModel()">Reset View</button>
+            <button style="margin-top:10px; background:#64748b; color:white; border:none; padding:8px; border-radius:4px; font-size:11px; cursor:pointer;" onclick="fitCameraToModel()">Center View</button>
         </div>
         <div class="nav-btns">
             <button id="prevBtn" onclick="changeStep(-1)" disabled>Back</button>
@@ -40,7 +38,7 @@
         </div>
     </div>
     <div id="viewport">
-        <div id="loader-ui">Optimizing 3D Geometry...</div>
+        <div id="loader-ui">Processing High-Precision 3D...</div>
         <div id="canvas-container"></div>
     </div>
 
@@ -74,24 +72,27 @@
         function initThree() {
             scene = new THREE.Scene();
             
-            // CAMERA FIX: Near plane increased to 5.0 for large models. 
-            // This stops the "X-ray" effect when viewing a whole printer frame.
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 5.0, 100000);
+            // CAMERA FIX: Near plane set to 1.0, Far to 50,000 for massive scale range.
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 1.0, 50000);
             
             renderer = new THREE.WebGLRenderer({ 
                 antialias: true, 
                 alpha: true,
-                logarithmicDepthBuffer: true 
+                logarithmicDepthBuffer: true, // Forces high-precision depth calculation
+                precision: "highp"            // Uses high-precision shaders
             });
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 3));
-            const light = new THREE.DirectionalLight(0xffffff, 1.5);
-            light.position.set(1000, 2000, 1500);
-            scene.add(light);
+            // Studio Lighting
+            scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 3.0));
+            const light1 = new THREE.DirectionalLight(0xffffff, 2.0);
+            light1.position.set(1000, 2000, 1500);
+            scene.add(light1);
 
             controls = new ArcballControls(camera, renderer.domElement, scene);
+            controls.setGizmosVisible(false);
             animate();
         }
 
@@ -105,7 +106,6 @@
             const loaderUI = document.getElementById('loader-ui');
             loaderUI.style.display = "block";
 
-            // Markdown Loading
             if (step.desc_file) {
                 const res = await fetch(step.desc_file + version);
                 const text = await res.text();
@@ -119,13 +119,14 @@
                 
                 currentModel.traverse(node => {
                     if (node.isMesh) {
-                        // MATERIAL FIX: Force every part to be solid and opaque
+                        // THE SOLIDITY FIX:
                         node.material.transparent = false;
                         node.material.depthWrite = true;
                         node.material.depthTest = true;
-                        node.material.side = THREE.FrontSide; // Stops you from seeing "inside-out"
+                        node.material.alphaTest = 0.5;
+                        node.material.side = THREE.FrontSide; // Only render outside faces
                         
-                        // Clean technical edges
+                        // Technical Lines
                         const edges = new THREE.EdgesGeometry(node.geometry, 25);
                         const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
                         node.add(line);
@@ -146,7 +147,7 @@
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = camera.fov * (Math.PI / 180);
-            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.3;
 
             camera.position.set(cameraZ, cameraZ, cameraZ);
             camera.updateProjectionMatrix();
