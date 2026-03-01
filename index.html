@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Xplorer IDEX Twin AFC - Assembly Manual</title>
+    <title>Xplorer IDEX Twin AFC - Professional Manual</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; --border: #e2e8f0; }
         body.dark-mode { --bg: #121212; --sidebar: #1a1a1a; --text: #e2e8f0; --border: #333; }
         body { margin: 0; display: flex; height: 100vh; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; transition: background 0.3s; }
         
-        /* Sidebar */
         .sidebar { width: 340px; padding: 25px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
         .progress-container { width: 100%; height: 6px; background: var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
         #progress-fill { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s ease; }
@@ -19,11 +18,7 @@
         
         .step-content { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
         h1 { font-size: 22px; margin: 5px 0; color: var(--accent); line-height: 1.2; }
-        
-        /* Markdown Style for BOM and Instructions */
         #step-desc { line-height: 1.6; font-size: 14px; margin-bottom: 20px; color: var(--text); }
-        #step-desc h1, #step-desc h2, #step-desc h3 { color: var(--accent); margin-top: 20px; font-size: 18px; }
-        #step-desc ul { padding-left: 20px; margin-bottom: 15px; }
         #step-desc table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px; }
         #step-desc th, #step-desc td { border: 1px solid var(--border); padding: 8px; text-align: left; }
         #step-desc th { background: var(--border); }
@@ -36,7 +31,6 @@
         .reset-btn { background: #64748b; flex: 1; font-size: 11px; padding: 8px; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .theme-btn { background: #444; flex: 1; font-size: 11px; padding: 8px; color: white; border: none; border-radius: 4px; cursor: pointer; }
 
-        /* Viewport Layout */
         #viewport { flex-grow: 1; position: relative; background: #ffffff; display: flex; }
         #canvas-container { width: 100%; height: 100%; position: absolute; top:0; left:0; }
         #media-container { width: 100%; height: 100%; display: none; background: #ffffff; position: absolute; top: 0; left: 0; }
@@ -95,8 +89,8 @@
 
         let menuData = [], currentChapIdx = 0, currentStepIdx = 0;
         let scene, camera, renderer, controls, currentModel;
+        let camLight; // Light that follows the camera
         
-        // Setup Loader with Meshopt Support to fix "2_0.glb" hang
         const loader = new GLTFLoader();
         loader.setMeshoptDecoder(MeshoptDecoder);
 
@@ -124,22 +118,30 @@
         function initThree() {
             scene = new THREE.Scene();
             
-            // Camera near/far adjusted for high-precision large scale models
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.5, 20000);
+            // FIX: Near plane set to 0.1 to allow close zoom without disappearing parts
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.1, 10000);
             
             renderer = new THREE.WebGLRenderer({ 
                 antialias: true, 
                 alpha: true,
-                logarithmicDepthBuffer: true // FIX: Prevents X-ray/ghosting effects on full frame
+                logarithmicDepthBuffer: true 
             });
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+            // Better color handling
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.5));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            dirLight.position.set(500, 1000, 750);
-            scene.add(dirLight);
+            // LIGHTING FIX: Multi-directional setup
+            const ambient = new THREE.AmbientLight(0xffffff, 1.2); // Global fill
+            scene.add(ambient);
+
+            const hemi = new THREE.HemisphereLight(0xffffff, 0xbbbbbb, 1.0);
+            scene.add(hemi);
+
+            // Point light that stays with the camera
+            camLight = new THREE.PointLight(0xffffff, 1.5);
+            scene.add(camLight);
 
             controls = new ArcballControls(camera, renderer.domElement, scene);
             controls.setGizmosVisible(false);
@@ -155,7 +157,6 @@
 
             document.getElementById('step-title').innerText = step.title;
 
-            // Load Markdown Description
             if (step.desc_file) {
                 try {
                     const res = await fetch(step.desc_file + version);
@@ -183,13 +184,12 @@
                     
                     currentModel.traverse(node => {
                         if (node.isMesh) {
-                            // SOLIDITY FIX: Disable transparency and force front-side only rendering
                             node.material.depthWrite = true;
                             node.material.transparent = false;
                             node.material.side = THREE.FrontSide; 
                             node.material.opacity = 1.0;
                             
-                            // Visual edges for CAD feel
+                            // Visual edges
                             const edges = new THREE.EdgesGeometry(node.geometry, 25);
                             const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
                             node.add(line);
@@ -202,7 +202,6 @@
                     fitCameraToModel();
                     loaderUI.style.display = "none";
                 }, undefined, (error) => {
-                    console.error(error);
                     loaderUI.innerHTML = `<span style="color:red">Error: ${error.message}</span>`;
                 });
             } else {
@@ -226,8 +225,8 @@
             const maxDim = Math.max(size.x, size.y, size.z);
             
             const fov = camera.fov * (Math.PI / 180);
-            // ZOOM FIX: Multiplier reduced to 1.15 so the model fills the view immediately
-            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.15;
+            // ZOOM FIX: Multiplier tightened to 1.1 for better initial fill
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.1;
 
             camera.position.set(cameraZ, cameraZ, cameraZ);
             camera.updateProjectionMatrix();
@@ -237,6 +236,8 @@
 
         function animate() {
             requestAnimationFrame(animate);
+            // Make the light follow the camera so the front is always lit
+            if(camLight) camLight.position.copy(camera.position);
             controls.update();
             renderer.render(scene, camera);
         }
