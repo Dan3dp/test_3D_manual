@@ -19,8 +19,6 @@
         .step-content { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
         h1 { font-size: 22px; margin: 5px 0; color: var(--accent); line-height: 1.2; }
         #step-desc { line-height: 1.6; font-size: 14px; margin-bottom: 20px; color: var(--text); }
-        #step-desc table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        #step-desc th, #step-desc td { border: 1px solid var(--border); padding: 5px; text-align: left; }
 
         .nav-btns { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
@@ -86,9 +84,8 @@
         import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 
         let menuData = [], currentChapIdx = 0, currentStepIdx = 0;
-        let scene, camera, renderer, controls, currentModel, mixer;
+        let scene, camera, renderer, controls, currentModel;
         const loader = new GLTFLoader();
-        const clock = new THREE.Clock();
 
         fetch('menu.json?v=' + new Date().getTime())
             .then(res => res.json())
@@ -113,17 +110,22 @@
 
         function initThree() {
             scene = new THREE.Scene();
-            // camera near/far planes adjusted for better depth and zoom
-            camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 340) / window.innerHeight, 0.1, 20000);
             
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, logarithmicDepthBuffer: true }); // logarithmicDepthBuffer helps Z-fighting
+            // Camera Near plane is now 1.0 to prevent internal ghosting on large models
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 1.0, 50000);
+            
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: true,
+                logarithmicDepthBuffer: true // THE KEY: Prevents X-ray/ghosting effects
+            });
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
             scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.5));
             const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            dirLight.position.set(5, 10, 7.5);
+            dirLight.position.set(500, 1000, 750);
             scene.add(dirLight);
 
             controls = new ArcballControls(camera, renderer.domElement, scene);
@@ -165,24 +167,20 @@
                     
                     currentModel.traverse(node => {
                         if (node.isMesh) {
-                            // SOLID SURFACES FIX: Force opaque materials and depth writing
+                            // Force materials to be solid
+                            node.material.depthWrite = true;
                             node.material.transparent = false;
                             node.material.opacity = 1.0;
-                            node.material.depthWrite = true;
-                            node.material.depthTest = true;
-                            node.material.side = THREE.DoubleSide; // Helps see interior walls
                             
-                            // Wireframe Overlay
+                            // High-quality wireframe lines
                             const edges = new THREE.EdgesGeometry(node.geometry, 25);
-                            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 }));
+                            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
                             node.add(line);
                         }
                     });
 
                     const box = new THREE.Box3().setFromObject(currentModel);
-                    const center = box.getCenter(new THREE.Vector3());
-                    currentModel.position.sub(center); // Center model at 0,0,0
-                    
+                    currentModel.position.sub(box.getCenter(new THREE.Vector3()));
                     scene.add(currentModel);
                     fitCameraToModel();
                     loaderUI.style.display = "none";
@@ -206,14 +204,12 @@
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
             
-            // ZOOM FIX: Tighter calculation for better initial view
+            // Dynamic Zoom: Fits based on object size
             const fov = camera.fov * (Math.PI / 180);
             let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
 
-            // Don't let the camera get too far away if the part is tiny
             camera.position.set(cameraZ, cameraZ, cameraZ);
-            camera.lookAt(0, 0, 0);
-            
+            camera.updateProjectionMatrix();
             controls.target.set(0, 0, 0);
             controls.update();
         };
