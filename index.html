@@ -19,6 +19,8 @@
         .step-content { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
         h1 { font-size: 22px; margin: 5px 0; color: var(--accent); line-height: 1.2; }
         #step-desc { line-height: 1.6; font-size: 14px; margin-bottom: 20px; color: var(--text); }
+        #step-desc table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        #step-desc th, #step-desc td { border: 1px solid var(--border); padding: 8px; text-align: left; }
 
         .nav-btns { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
@@ -111,13 +113,13 @@
         function initThree() {
             scene = new THREE.Scene();
             
-            // Camera Near plane is now 1.0 to prevent internal ghosting on large models
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.01, 4000);
+            // Adjusting near/far plane for high-precision large scale models
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.5, 10000);
             
             renderer = new THREE.WebGLRenderer({ 
                 antialias: true, 
                 alpha: true,
-                logarithmicDepthBuffer: true // THE KEY: Prevents X-ray/ghosting effects
+                logarithmicDepthBuffer: true 
             });
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -167,12 +169,12 @@
                     
                     currentModel.traverse(node => {
                         if (node.isMesh) {
-                            // Force materials to be solid
+                            // SOLIDITY FIX: Disable transparency and set side to FRONT
                             node.material.depthWrite = true;
                             node.material.transparent = false;
+                            node.material.side = THREE.FrontSide; // Stops you from seeing "through" the extrusions
                             node.material.opacity = 1.0;
                             
-                            // High-quality wireframe lines
                             const edges = new THREE.EdgesGeometry(node.geometry, 25);
                             const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
                             node.add(line);
@@ -204,9 +206,9 @@
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
             
-            // Dynamic Zoom: Fits based on object size
             const fov = camera.fov * (Math.PI / 180);
-            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+            // ZOOM FIX: Reduced multiplier from 1.5 to 1.15 to make the model fill the view
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.15;
 
             camera.position.set(cameraZ, cameraZ, cameraZ);
             camera.updateProjectionMatrix();
