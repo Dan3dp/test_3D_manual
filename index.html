@@ -3,14 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Xplorer IDEX Twin AFC - Assembly Manual</title>
-    <script src="https://cdn.jsdelivr.net/npm/occt-import-js@0.0.12/dist/occt-import-js.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root { --accent: #2563eb; --bg: #ffffff; --sidebar: #f8fafc; --text: #1e293b; --border: #e2e8f0; }
         body.dark-mode { --bg: #121212; --sidebar: #1a1a1a; --text: #e2e8f0; --border: #333; }
         body { margin: 0; display: flex; height: 100vh; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; transition: background 0.3s; }
         
-        /* Sidebar */
         .sidebar { width: 340px; padding: 25px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
         .progress-container { width: 100%; height: 6px; background: var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
         #progress-fill { width: 0%; height: 100%; background: var(--accent); transition: width 0.3s ease; }
@@ -20,28 +18,18 @@
         
         .step-content { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
         h1 { font-size: 22px; margin: 5px 0; color: var(--accent); line-height: 1.2; }
-        
-        /* Markdown Style */
         #step-desc { line-height: 1.6; font-size: 14px; margin-bottom: 20px; color: var(--text); }
-        #step-desc h1, #step-desc h2, #step-desc h3 { color: var(--accent); margin-top: 20px; }
-        #step-desc ul { padding-left: 20px; margin-bottom: 15px; }
-        #step-desc code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; }
+        #step-desc ul { padding-left: 20px; }
 
         .nav-btns { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
         button:disabled { background: #cbd5e1; cursor: not-allowed; }
         
-        .ui-controls { display: flex; gap: 5px; margin-top: 10px; }
-        .reset-btn, .theme-btn { font-size: 11px; padding: 8px; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .reset-btn { background: #64748b; flex: 2; }
-        .theme-btn { background: #444; flex: 1; }
-
         #viewport { flex-grow: 1; position: relative; background: #ffffff; display: flex; }
         #canvas-container { width: 100%; height: 100%; position: absolute; top:0; left:0; }
         #media-container { width: 100%; height: 100%; display: none; background: #ffffff; position: absolute; top: 0; left: 0; }
         #media-container iframe { width: 100%; height: 100%; border: none; }
-        #media-container img { max-width: 100%; max-height: 100%; object-fit: contain; margin: auto; }
-
+        
         #loader-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; color: var(--accent); font-weight: bold; z-index: 5; text-align: center; }
         .hint { position: absolute; bottom: 20px; right: 20px; font-size: 11px; color: #94a3b8; background: rgba(0,0,0,0.05); padding: 5px 12px; border-radius: 20px; pointer-events: none;}
     </style>
@@ -51,16 +39,12 @@
     <div class="sidebar">
         <div class="progress-container"><div id="progress-fill"></div></div>
         <div id="step-counter">Step 1 of 1</div>
-        <label style="font-size: 10px; color: #94a3b8; font-weight: bold;">CHAPTER</label>
         <select id="chapterSelect" onchange="loadChapter(this.value)"></select>
 
         <div class="step-content">
             <h1 id="step-title">Xplorer IDEX Twin AFC</h1>
-            <div id="step-desc">Loading instructions...</div>
-            <div class="ui-controls">
-                <button id="resetViewBtn" class="reset-btn" onclick="fitCameraToModel()">Reset Camera</button>
-                <button class="theme-btn" onclick="document.body.classList.toggle('dark-mode')">Dark Mode</button>
-            </div>
+            <div id="step-desc">Loading...</div>
+            <button class="theme-btn" style="background:#444; color:white; border:none; padding:5px; border-radius:4px; font-size:10px; cursor:pointer;" onclick="document.body.classList.toggle('dark-mode')">Toggle Dark Mode</button>
         </div>
 
         <div class="nav-btns">
@@ -70,10 +54,10 @@
     </div>
 
     <div id="viewport">
-        <div id="loader-ui">Initializing CAD Engine...</div>
+        <div id="loader-ui">Loading 3D Object...</div>
         <div id="canvas-container"></div>
         <div id="media-container"></div>
-        <div id="3d-hint" class="hint">Left Click: Rotate | Right Click: Pan | Scroll: Zoom</div>
+        <div class="hint">Left Click: Rotate | Right Click: Pan | Scroll: Zoom</div>
     </div>
 
     <script type="importmap">
@@ -87,11 +71,12 @@
 
     <script type="module">
         import * as THREE from 'three';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
         import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 
         let menuData = [], currentChapIdx = 0, currentStepIdx = 0;
         let scene, camera, renderer, controls, currentModel;
-        const occtPromise = occtimportjs();
+        const objLoader = new OBJLoader();
 
         fetch('menu.json?v=' + new Date().getTime())
             .then(res => res.json())
@@ -116,12 +101,11 @@
 
         function initThree() {
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.1, 5000);
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 1, 10000);
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth - 340, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
             document.getElementById('canvas-container').appendChild(renderer.domElement);
-            scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.5));
+            scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 3));
             controls = new ArcballControls(camera, renderer.domElement, scene);
             controls.setGizmosVisible(false);
             animate();
@@ -130,86 +114,55 @@
         async function loadStep(chapIdx, stepIdx) {
             currentChapIdx = chapIdx;
             currentStepIdx = stepIdx;
-            const chapter = menuData[chapIdx];
-            const step = chapter.steps[stepIdx];
+            const step = menuData[chapIdx].steps[stepIdx];
             const fileName = step.file.toLowerCase();
             const version = '?v=' + new Date().getTime();
 
-            // 1. Update Basic UI
             document.getElementById('step-title').innerText = step.title;
-            document.getElementById('progress-fill').style.width = `${((stepIdx + 1) / chapter.steps.length) * 100}%`;
-            document.getElementById('step-counter').innerText = `Step ${stepIdx + 1} of ${chapter.steps.length}`;
-
-            // 2. Load Description from MD file (Option 1)
+            
+            // Markdown logic
             if (step.desc_file) {
-                try {
-                    const res = await fetch(step.desc_file + version);
-                    const text = await res.text();
-                    document.getElementById('step-desc').innerHTML = marked.parse(text);
-                } catch (e) { document.getElementById('step-desc').innerText = "MD Description not found."; }
-            } else {
-                // Fallback to old desc field if md file is missing
-                document.getElementById('step-desc').innerHTML = marked.parse(step.desc || "No description provided.");
+                const res = await fetch(step.desc_file + version);
+                const text = await res.text();
+                document.getElementById('step-desc').innerHTML = marked.parse(text);
             }
 
-            // 3. 3D & Media Loading
             const canvasDiv = document.getElementById('canvas-container');
             const mediaDiv = document.getElementById('media-container');
             const loaderUI = document.getElementById('loader-ui');
 
-            if (fileName.endsWith('.step') || fileName.endsWith('.stp')) {
+            if (fileName.endsWith('.obj')) {
                 canvasDiv.style.display = "block";
                 mediaDiv.style.display = "none";
                 loaderUI.style.display = "block";
-                loaderUI.innerHTML = "Downloading CAD...";
 
                 if (currentModel) scene.remove(currentModel);
 
-                try {
-                    const res = await fetch(encodeURI(step.file) + version);
-                    if (!res.ok) throw new Error("File not found");
-                    const buffer = await res.arrayBuffer();
-                    
-                    loaderUI.innerHTML = "Tessellating Geometry...";
-                    const occt = await occtPromise;
-                    
-                    // FIXED: Now using only 1 argument to prevent the error
-                    const result = occt.ReadStepFile(new Uint8Array(buffer));
-                    
-                    if (!result.success) throw new Error("CAD processing failed");
-
-                    currentModel = new THREE.Group();
-                    result.meshes.forEach((m) => {
-                        const geometry = new THREE.BufferGeometry();
-                        geometry.setAttribute('position', new THREE.Float32BufferAttribute(m.attributes.position.array, 3));
-                        const mat = new THREE.MeshStandardMaterial({ 
-                            color: new THREE.Color(m.color ? `rgb(${m.color[0]},${m.color[1]},${m.color[2]})` : '#b1b1b1'),
-                            metalness: 0.3, roughness: 0.6 
-                        });
-                        const mesh = new THREE.Mesh(geometry, mat);
-                        const edges = new THREE.EdgesGeometry(geometry, 25);
-                        mesh.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x222222 })));
-                        currentModel.add(mesh);
+                objLoader.load(step.file + version, (obj) => {
+                    currentModel = obj;
+                    currentModel.traverse(child => {
+                        if (child.isMesh) {
+                            child.material = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.5, roughness: 0.5 });
+                            const edges = new THREE.EdgesGeometry(child.geometry, 20);
+                            child.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x333333 })));
+                        }
                     });
-
                     const box = new THREE.Box3().setFromObject(currentModel);
                     currentModel.position.sub(box.getCenter(new THREE.Vector3()));
                     scene.add(currentModel);
                     fitCameraToModel();
                     loaderUI.style.display = "none";
-                } catch (err) {
-                    loaderUI.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
-                }
+                });
             } else {
                 canvasDiv.style.display = "none";
                 mediaDiv.style.display = "flex";
                 loaderUI.style.display = "none";
-                const mediaUrl = encodeURI(step.file) + version;
-                mediaDiv.innerHTML = fileName.endsWith('.pdf') ? `<iframe src="${mediaUrl}"></iframe>` : `<img src="${mediaUrl}">`;
+                mediaDiv.innerHTML = fileName.endsWith('.pdf') ? `<iframe src="${step.file}"></iframe>` : `<img src="${step.file}">`;
             }
 
+            document.getElementById('progress-fill').style.width = `${((stepIdx + 1) / menuData[chapIdx].steps.length) * 100}%`;
             document.getElementById('prevBtn').disabled = (stepIdx === 0);
-            document.getElementById('nextBtn').disabled = (stepIdx === chapter.steps.length - 1);
+            document.getElementById('nextBtn').disabled = (stepIdx === menuData[chapIdx].steps.length - 1);
             document.getElementById('chapterSelect').value = chapIdx;
         }
 
@@ -218,19 +171,13 @@
             const box = new THREE.Box3().setFromObject(currentModel);
             const size = box.getSize(new THREE.Vector3());
             const maxDim = Math.max(size.x, size.y, size.z);
-            const dist = (maxDim / (2 * Math.tan((camera.fov * Math.PI / 180) / 2))) * 1.5;
+            const dist = maxDim * 2.5; 
             camera.position.set(dist, dist, dist);
             camera.lookAt(0, 0, 0);
-            controls.target.set(0,0,0);
             controls.update();
         };
 
         function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
-        window.onresize = () => {
-            camera.aspect = (window.innerWidth - 340) / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth - 340, window.innerHeight);
-        };
     </script>
 </body>
 </html>

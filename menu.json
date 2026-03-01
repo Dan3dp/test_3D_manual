@@ -16,7 +16,7 @@
       {
         "title": "2.0: Frame - Introduction",
         "desc": "Description/2_0.md",
-        "file": "Graphics/2_0.stp"
+        "file": "Graphics/2_0.obj"
         }
       ]
     },
@@ -26,7 +26,7 @@
       {
         "title": "2.1: Frame beam MGN Y-Axis",
         "desc": "In the first and last hole of the rail, preassemble the printed part for MGN rail alignment using DIN 912x20 screws and M3 T-nuts.",
-        "file": "Graphics/2_1_1.step"
+        "file": "Graphics/2_1_1.obj"
       }
     ]
   }
