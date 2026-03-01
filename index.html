@@ -112,7 +112,7 @@
             scene = new THREE.Scene();
             
             // Camera Near plane is now 1.0 to prevent internal ghosting on large models
-            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 1.0, 50000);
+            camera = new THREE.PerspectiveCamera(40, (window.innerWidth - 340) / window.innerHeight, 0.1, 3000);
             
             renderer = new THREE.WebGLRenderer({ 
                 antialias: true, 
